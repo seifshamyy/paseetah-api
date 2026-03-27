@@ -273,6 +273,17 @@ class AsyncAuthService:
     # ------------------------------------------------------------------
 
     def _load_cache(self) -> Optional[dict[str, str]]:
+        # 1. Prefer the env var (Railway / Docker deployments)
+        if settings.SESSION_CACHE_JSON:
+            try:
+                data = json.loads(settings.SESSION_CACHE_JSON)
+                if isinstance(data, dict) and data:
+                    logger.info("Loaded session cookies from SESSION_CACHE_JSON env var.")
+                    return data
+            except json.JSONDecodeError as exc:
+                logger.warning(f"SESSION_CACHE_JSON is set but invalid JSON: {exc}")
+
+        # 2. Fall back to file on disk
         if not os.path.exists(self._cache_file):
             return None
         try:

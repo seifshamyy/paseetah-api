@@ -12,6 +12,9 @@ class Settings:
     SESSION_CACHE_FILE: str = os.path.join(
         os.path.dirname(__file__), "session_cache.json"
     )
+    # Optional: paste the full session_cache.json content as a single env var.
+    # When set, this takes priority over the file on disk (useful for Railway/Docker).
+    SESSION_CACHE_JSON: str = os.getenv("SESSION_CACHE_JSON", "")
 
 
 settings = Settings()
