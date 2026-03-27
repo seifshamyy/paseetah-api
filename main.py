@@ -1,11 +1,14 @@
 """
 main.py
-FastAPI application — exposes POST /api/v1/fetch-real-estate.
-Handles 401/403 by refreshing the session and retrying once.
+FastAPI application — two endpoints:
+  POST /api/v1/fetch-moj   → Ministry of Justice (sales_transaction)
+  POST /api/v1/fetch-civil → Civil / Real-Estate Register (rer_transactions)
+Both handle 401/403 by refreshing the session and retrying once.
 """
 
 import logging
 from contextlib import asynccontextmanager
+from typing import Callable, Awaitable
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -14,7 +17,7 @@ from fastapi.responses import JSONResponse
 from auth_service import AsyncAuthService, LoginError
 from config import settings
 from data_client import AsyncDataClient
-from models import PaseetahDataRequest
+from models import MojDataRequest, CivilDataRequest
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -26,14 +29,13 @@ logging.basicConfig(
 logger = logging.getLogger("paseetah.main")
 
 # ---------------------------------------------------------------------------
-# Global auth service (shared across requests)
+# Global auth service
 # ---------------------------------------------------------------------------
 auth_service = AsyncAuthService()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load cached session on startup."""
     logger.info("Starting Paseetah API — loading session cache...")
     await auth_service.startup()
     yield
@@ -46,90 +48,82 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Paseetah Real Estate API",
     description=(
-        "Authenticated proxy to the Paseetah real estate platform. "
-        "Handles reCAPTCHA bypass and session management automatically."
+        "Authenticated proxy to Paseetah. Two datasets:\n\n"
+        "- **MOJ** (`/api/v1/fetch-moj`): Ministry of Justice sales transactions\n"
+        "- **Civil** (`/api/v1/fetch-civil`): Real Estate Register (RER) transactions"
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
 
 # ---------------------------------------------------------------------------
-# Endpoint
+# Shared retry helper
 # ---------------------------------------------------------------------------
-@app.post("/api/v1/fetch-real-estate")
-async def fetch_real_estate(request: PaseetahDataRequest):
+async def _fetch_with_retry(fetch_fn: Callable[..., Awaitable[dict]]) -> JSONResponse:
     """
-    Fetch sales transaction data from paseetah.com.
-
-    - On success (HTTP 200 from Paseetah): returns the raw JSON payload.
-    - On 401/403: refreshes the session via a fresh Playwright login and
-      retries the request exactly once.
-    - On repeated failure or CAPTCHA errors: returns HTTP 500.
+    Calls fetch_fn(client) once. On 401/403, refreshes session and retries once.
+    fetch_fn receives an AsyncDataClient built from fresh cookies.
     """
-    # -----------------------------------------------------------------------
     # First attempt
-    # -----------------------------------------------------------------------
     try:
         cookies = await auth_service.get_cookies()
-        client = AsyncDataClient(cookies)
-        data = await client.fetch(request)
+        data = await fetch_fn(AsyncDataClient(cookies))
         return JSONResponse(content=data)
 
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
-
         if status not in (401, 403):
-            logger.error(f"Paseetah returned unexpected status {status}: {exc}")
-            raise HTTPException(
-                status_code=502,
-                detail=f"Paseetah API returned {status}: {exc.response.text[:500]}",
-            )
+            raise HTTPException(status_code=502, detail=f"Paseetah returned {status}")
+        logger.warning(f"HTTP {status} — refreshing session and retrying...")
 
-        logger.warning(
-            f"Received HTTP {status} from Paseetah. Refreshing session and retrying..."
-        )
-
-    # -----------------------------------------------------------------------
-    # Session refresh + single retry
-    # -----------------------------------------------------------------------
+    # Re-login
     try:
         await auth_service.invalidate_and_relogin()
     except LoginError as exc:
-        logger.error(f"Re-login failed: {exc}")
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Authentication failed after receiving a session error from Paseetah. "
-                f"Details: {exc}"
-            ),
-        )
+        raise HTTPException(status_code=500, detail=f"Re-login failed: {exc}")
 
+    # Retry
     try:
         cookies = await auth_service.get_cookies()
-        client = AsyncDataClient(cookies)
-        data = await client.fetch(request)
+        data = await fetch_fn(AsyncDataClient(cookies))
         return JSONResponse(content=data)
-
     except httpx.HTTPStatusError as exc:
-        status = exc.response.status_code
-        logger.error(
-            f"Retry also failed with HTTP {status}. Giving up."
-        )
         raise HTTPException(
             status_code=500,
-            detail=(
-                f"Paseetah returned HTTP {status} even after a fresh session refresh. "
-                "Check credentials, CAPTCHA solver balance, or Paseetah service availability."
-            ),
+            detail=f"Paseetah returned {exc.response.status_code} even after session refresh.",
         )
-
     except Exception as exc:
-        logger.exception(f"Unexpected error during retry: {exc}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Unexpected error during retry: {exc}",
-        )
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+@app.post(
+    "/api/v1/fetch-moj",
+    summary="Ministry of Justice — Sales Transactions",
+    tags=["MOJ"],
+)
+async def fetch_moj(request: MojDataRequest):
+    """
+    Fetch transactions from the Ministry of Justice dataset.
+    Filter by `regions`, `cities`, and/or `neighborhoods` (list of ints).
+    """
+    return await _fetch_with_retry(lambda client: client.fetch_moj(request))
+
+
+@app.post(
+    "/api/v1/fetch-civil",
+    summary="Civil / Real-Estate Register — RER Transactions",
+    tags=["Civil"],
+)
+async def fetch_civil(request: CivilDataRequest):
+    """
+    Fetch transactions from the Real Estate Register (civil records) dataset.
+    Filter by `regions`, `cities`, and/or `neighborhoods` (list of ints).
+    """
+    return await _fetch_with_retry(lambda client: client.fetch_civil(request))
 
 
 # ---------------------------------------------------------------------------
@@ -137,5 +131,4 @@ async def fetch_real_estate(request: PaseetahDataRequest):
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run("main:app", host="0.0.0.0", port=settings.PORT, reload=True)
