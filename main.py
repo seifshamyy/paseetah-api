@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from auth_service import AsyncAuthService, LoginError
 from config import settings
 from data_client import AsyncDataClient
+from geo_service import GeoService
 from models import MojDataRequest, CivilDataRequest
 
 # ---------------------------------------------------------------------------
@@ -141,6 +142,41 @@ async def probe_geo():
     client = AsyncDataClient(cookies)
     results = await client.probe_geo_endpoints()
     return results
+
+
+# ---------------------------------------------------------------------------
+# Geo endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v1/geo/regions", summary="List all regions", tags=["Geo"])
+async def geo_regions():
+    """Return all regions."""
+    cookies = await auth_service.get_cookies()
+    return await GeoService(cookies).get_all_regions()
+
+
+@app.get("/api/v1/geo/cities", summary="Cities for a region", tags=["Geo"])
+async def geo_cities(region_id: int):
+    """Return cities for a given region_id."""
+    cookies = await auth_service.get_cookies()
+    return await GeoService(cookies).get_cities_for_region(region_id)
+
+
+@app.get("/api/v1/geo/neighborhoods", summary="Neighborhoods for a city", tags=["Geo"])
+async def geo_neighborhoods(region_id: int, city_id: int):
+    """Return neighborhoods for a given region_id + city_id."""
+    cookies = await auth_service.get_cookies()
+    return await GeoService(cookies).get_neighborhoods_for_city(region_id, city_id)
+
+
+@app.get("/api/v1/geo/tree", summary="Full region→city→neighborhood tree", tags=["Geo"])
+async def geo_tree():
+    """
+    Return the full geographic tree. First call triggers a Playwright scrape
+    (~30s). Subsequent calls return the cached result instantly.
+    """
+    cookies = await auth_service.get_cookies()
+    return await GeoService(cookies).get_full_tree()
 
 
 # ---------------------------------------------------------------------------
