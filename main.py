@@ -150,7 +150,7 @@ async def probe_geo():
 
 @app.get("/api/v1/geo/regions", summary="List all regions", tags=["Geo"])
 async def geo_regions():
-    """Return all regions."""
+    """Return all Saudi regions."""
     cookies = await auth_service.get_cookies()
     return await GeoService(cookies).get_all_regions()
 
@@ -163,20 +163,21 @@ async def geo_cities(region_id: int):
 
 
 @app.get("/api/v1/geo/neighborhoods", summary="Neighborhoods for a city", tags=["Geo"])
-async def geo_neighborhoods(region_id: int, city_id: int):
-    """Return neighborhoods for a given region_id + city_id."""
+async def geo_neighborhoods(city_id: int):
+    """Return neighborhoods for a given city_id."""
     cookies = await auth_service.get_cookies()
-    return await GeoService(cookies).get_neighborhoods_for_city(region_id, city_id)
+    return await GeoService(cookies).get_neighborhoods_for_city(city_id)
 
 
-@app.get("/api/v1/geo/tree", summary="Full region→city→neighborhood tree", tags=["Geo"])
-async def geo_tree():
+@app.get("/api/v1/geo/tree", summary="Full city→neighborhood tree for a region", tags=["Geo"])
+async def geo_tree(region_id: int):
     """
-    Return the full geographic tree. First call triggers a Playwright scrape
-    (~30s). Subsequent calls return the cached result instantly.
+    Return all cities + neighborhoods for a given region.
+    Example: ?region_id=1  →  Riyadh cities + their neighborhoods.
     """
     cookies = await auth_service.get_cookies()
-    return await GeoService(cookies).get_full_tree()
+    return await GeoService(cookies).get_full_tree(region_id)
+
 
 
 # ---------------------------------------------------------------------------
