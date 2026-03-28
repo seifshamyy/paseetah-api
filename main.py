@@ -150,40 +150,47 @@ async def probe_geo():
 
 @app.get("/api/v1/geo/regions", summary="List all regions", tags=["Geo"])
 async def geo_regions():
-    """Return all Saudi regions."""
-    cookies = await auth_service.get_cookies()
-    return await GeoService(cookies).get_all_regions()
+    try:
+        cookies = await auth_service.get_cookies()
+        return await GeoService(cookies).get_all_regions()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"{type(exc).__name__}: {exc}")
 
 
 @app.get("/api/v1/geo/cities", summary="Cities for a region", tags=["Geo"])
 async def geo_cities(region_id: int):
-    """Return cities for a given region_id."""
-    cookies = await auth_service.get_cookies()
-    return await GeoService(cookies).get_cities_for_region(region_id)
+    try:
+        cookies = await auth_service.get_cookies()
+        return await GeoService(cookies).get_cities_for_region(region_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"{type(exc).__name__}: {exc}")
 
 
 @app.get("/api/v1/geo/neighborhoods", summary="Neighborhoods for a city", tags=["Geo"])
 async def geo_neighborhoods(city_id: int):
-    """Return neighborhoods for a given city_id."""
-    cookies = await auth_service.get_cookies()
-    return await GeoService(cookies).get_neighborhoods_for_city(city_id)
+    try:
+        cookies = await auth_service.get_cookies()
+        return await GeoService(cookies).get_neighborhoods_for_city(city_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"{type(exc).__name__}: {exc}")
 
 
 @app.get("/api/v1/geo/tree", summary="Full city→neighborhood tree for a region", tags=["Geo"])
 async def geo_tree(region_id: int):
-    """
-    Return all cities + neighborhoods for a given region.
-    Example: ?region_id=1  →  Riyadh cities + their neighborhoods.
-    """
-    cookies = await auth_service.get_cookies()
-    return await GeoService(cookies).get_full_tree(region_id)
+    try:
+        cookies = await auth_service.get_cookies()
+        return await GeoService(cookies).get_full_tree(region_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"{type(exc).__name__}: {exc}")
 
 
 @app.get("/api/v1/geo/probe-neighborhoods", summary="Find correct neighborhood endpoint", tags=["Geo"])
 async def probe_neighborhoods_endpoint(city_id: int = 1, region_id: int = 1):
-    """Probe 80+ URL/param combinations to find the working neighborhoods endpoint."""
-    cookies = await auth_service.get_cookies()
-    return await GeoService(cookies).probe_neighborhoods(city_id, region_id)
+    try:
+        cookies = await auth_service.get_cookies()
+        return await GeoService(cookies).probe_neighborhoods(city_id, region_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"{type(exc).__name__}: {exc}")
 
 
 
