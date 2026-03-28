@@ -126,6 +126,23 @@ async def fetch_civil(request: CivilDataRequest):
     return await _fetch_with_retry(lambda client: client.fetch_civil(request))
 
 
+@app.get(
+    "/api/v1/geo/probe",
+    summary="Probe all candidate geo/neighborhood API endpoints",
+    tags=["Geo"],
+)
+async def probe_geo():
+    """
+    Fires ~20 candidate Paseetah geo URLs in parallel using your session
+    cookies and returns the HTTP status + response preview for each.
+    200s are listed first — use this to discover which endpoints exist.
+    """
+    cookies = await auth_service.get_cookies()
+    client = AsyncDataClient(cookies)
+    results = await client.probe_geo_endpoints()
+    return results
+
+
 # ---------------------------------------------------------------------------
 # Dev runner
 # ---------------------------------------------------------------------------

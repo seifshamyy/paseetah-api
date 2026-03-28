@@ -7,6 +7,7 @@ Supports two endpoints:
   - Civil (RER):                 /api/precord/rer_transactions/data
 """
 
+import asyncio
 import logging
 from urllib.parse import unquote
 
@@ -37,6 +38,30 @@ COMMON_HEADERS = {
         "Chrome/146.0.0.0 Safari/537.36"
     ),
 }
+
+# Candidate geo URLs to probe (region_id=1 baked in where relevant)
+GEO_CANDIDATES = [
+    ("GET",  "https://paseetah.com/api/regions",                          None),
+    ("GET",  "https://paseetah.com/api/cities?region_id=1",               None),
+    ("GET",  "https://paseetah.com/api/neighborhoods?region_id=1",        None),
+    ("GET",  "https://paseetah.com/api/neighborhoods?city_id=1",          None),
+    ("GET",  "https://paseetah.com/api/geo",                              None),
+    ("GET",  "https://paseetah.com/api/geo/regions",                      None),
+    ("GET",  "https://paseetah.com/api/geo/cities?region_id=1",           None),
+    ("GET",  "https://paseetah.com/api/geo/neighborhoods?region_id=1",    None),
+    ("GET",  "https://paseetah.com/api/lookup/regions",                   None),
+    ("GET",  "https://paseetah.com/api/lookup/cities?region_id=1",        None),
+    ("GET",  "https://paseetah.com/api/lookup/neighborhoods?region_id=1", None),
+    ("GET",  "https://paseetah.com/api/precord/regions",                  None),
+    ("GET",  "https://paseetah.com/api/precord/cities?region_id=1",       None),
+    ("GET",  "https://paseetah.com/api/precord/neighborhoods?region_id=1",None),
+    ("POST", "https://paseetah.com/api/regions",                          {"region_id": 1}),
+    ("POST", "https://paseetah.com/api/cities",                           {"region_id": 1}),
+    ("POST", "https://paseetah.com/api/neighborhoods",                    {"region_id": 1, "city_id": 1}),
+    ("POST", "https://paseetah.com/api/precord/regions",                  {}),
+    ("POST", "https://paseetah.com/api/precord/cities",                   {"region_id": 1}),
+    ("POST", "https://paseetah.com/api/precord/neighborhoods",            {"region_id": 1}),
+]
 
 
 class AsyncDataClient:
@@ -76,3 +101,30 @@ class AsyncDataClient:
         """Civil / Real-Estate Register — rer_transactions."""
         return await self._post(CIVIL_URL, CIVIL_REFERER, request.model_dump())
 
+    async def probe_geo_endpoints(self) -> list[dict]:
+        """
+        Fire all GEO_CANDIDATES in parallel, return status + response
+        preview for each so we can discover which endpoints exist.
+        """
+        headers = self._build_headers("https://paseetah.com/")
+        results = []
+
+        async def _probe(method: str, url: str, body):
+            entry = {"method": method, "url": url, "status": None, "preview": None, "error": None}
+            try:
+                async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+                    if method == "GET":
+                        r = await client.get(url, headers=headers, cookies=self._cookies)
+                    else:
+                        r = await client.post(url, json=body or {}, headers=headers, cookies=self._cookies)
+                entry["status"] = r.status_code
+                # Return first 600 chars of response
+                entry["preview"] = r.text[:600]
+            except Exception as exc:
+                entry["error"] = str(exc)
+            return entry
+
+        tasks = [_probe(m, u, b) for m, u, b in GEO_CANDIDATES]
+        results = await asyncio.gather(*tasks)
+        # Sort: 200s first, then by status code
+        return sorted(results, key=lambda x: (x["status"] != 200, x["status"] or 999))
