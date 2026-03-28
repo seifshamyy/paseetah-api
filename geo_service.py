@@ -71,9 +71,53 @@ class GeoService:
         result = []
         for city in cities:
             cid = city.get("id")
-            hoods = await self._fetch_neighborhoods(cid) if cid else []
+            try:
+                hoods = await self._fetch_neighborhoods(cid) if cid else []
+            except Exception:
+                hoods = []
             result.append({**city, "neighborhoods": hoods})
         return result
+
+    async def probe_neighborhoods(self, city_id: int = 1, region_id: int = 1) -> list[dict]:
+        """Try all plausible neighborhood URL + param combinations in parallel."""
+        import asyncio as _asyncio
+
+        base = "https://paseetah.com/api"
+        route_names = [
+            "get-neighborhoods", "get-neighborhood",
+            "get-districts",     "get-district",
+            "get-areas",         "get-area",
+            "get-sub-cities",    "get-quarters",
+            "get-zones",         "get-blocks",
+        ]
+        prefixes = ["paseetah-record", "precord"]
+        param_sets = [
+            {"city_id": city_id},
+            {"region_id": region_id, "city_id": city_id},
+            {"city": city_id},
+            {"id": city_id},
+        ]
+
+        candidates = []
+        for prefix in prefixes:
+            for route in route_names:
+                for params in param_sets:
+                    candidates.append((f"{base}/{prefix}/{route}", params))
+
+        results = []
+
+        async def _try(url, params):
+            try:
+                async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
+                    r = await client.get(url, params=params, headers=self._headers, cookies=self._cookies)
+                return {"url": url, "params": params, "status": r.status_code, "preview": r.text[:300]}
+            except Exception as e:
+                return {"url": url, "params": params, "status": None, "error": str(e)}
+
+        tasks = [_try(u, p) for u, p in candidates]
+        results = await _asyncio.gather(*tasks)
+        return sorted(results, key=lambda x: (x.get("status") != 200, x.get("status") or 999))
+
 
     # ------------------------------------------------------------------
     # Internal fetchers

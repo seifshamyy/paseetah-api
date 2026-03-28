@@ -179,6 +179,14 @@ async def geo_tree(region_id: int):
     return await GeoService(cookies).get_full_tree(region_id)
 
 
+@app.get("/api/v1/geo/probe-neighborhoods", summary="Find correct neighborhood endpoint", tags=["Geo"])
+async def probe_neighborhoods_endpoint(city_id: int = 1, region_id: int = 1):
+    """Probe 80+ URL/param combinations to find the working neighborhoods endpoint."""
+    cookies = await auth_service.get_cookies()
+    return await GeoService(cookies).probe_neighborhoods(city_id, region_id)
+
+
+
 
 # ---------------------------------------------------------------------------
 # Dev runner
