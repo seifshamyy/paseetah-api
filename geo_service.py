@@ -225,7 +225,19 @@ class GeoService:
 
     async def _fetch_neighbourhoods(self) -> list[dict]:
         logger.info("Fetching all neighbourhoods...")
-        return await self._get(f"{BASE}/get-neighbourhoods")
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            resp = await client.post(
+                f"{BASE}/get-neighbourhoods",
+                headers=self._headers,
+                cookies=self._cookies,
+            )
+        resp.raise_for_status()
+        data = resp.json()
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return data.get("data") or data.get("neighbourhoods") or data.get("neighborhoods") or []
+        return []
 
 
 # ------------------------------------------------------------------
