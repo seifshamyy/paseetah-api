@@ -2,8 +2,8 @@
 geo_service.py
 Direct httpx calls to Paseetah's discovered geo API:
   GET /api/paseetah-record/get-regions
-  GET /api/paseetah-record/get-cities?region_id={id}
-  GET /api/paseetah-record/get-neighborhoods?city_id={id}
+  GET /api/paseetah-record/get-cities          (returns all cities, filter client-side)
+  GET /api/paseetah-record/get-neighbourhoods  (returns all, filter client-side by city_id)
 Results are cached in geo_cache.json.
 """
 
@@ -57,24 +57,24 @@ class GeoService:
         return await self._fetch_regions()
 
     async def get_cities_for_region(self, region_id: int) -> list[dict]:
-        return await self._fetch_cities(region_id)
+        all_cities = await self._fetch_cities()
+        return [c for c in all_cities if c.get("region_id") == region_id]
 
     async def get_neighborhoods_for_city(self, city_id: int) -> list[dict]:
-        return await self._fetch_neighborhoods(city_id)
+        all_hoods = await self._fetch_neighbourhoods()
+        return [n for n in all_hoods if n.get("city_id") == city_id]
 
     async def get_full_tree(self, region_id: int) -> list[dict]:
         """
         Return all cities + neighborhoods for a given region.
-        Builds:  [ { city_id, city_name_en, city_name_ar, neighborhoods: [...] } ]
         """
-        cities = await self._fetch_cities(region_id)
+        all_cities = await self._fetch_cities()
+        all_hoods = await self._fetch_neighbourhoods()
+        cities = [c for c in all_cities if c.get("region_id") == region_id]
         result = []
         for city in cities:
             cid = city.get("id")
-            try:
-                hoods = await self._fetch_neighborhoods(cid) if cid else []
-            except Exception:
-                hoods = []
+            hoods = [n for n in all_hoods if n.get("city_id") == cid]
             result.append({**city, "neighborhoods": hoods})
         return result
 
@@ -214,18 +214,18 @@ class GeoService:
         return []
 
     async def _fetch_regions(self) -> list[dict]:
-        logger.info("Fetching regions from Paseetah geo API...")
+        logger.info("Fetching regions...")
         regions = await self._get(f"{BASE}/get-regions")
         _save_cache({"regions": regions})
         return regions
 
-    async def _fetch_cities(self, region_id: int) -> list[dict]:
-        logger.info(f"Fetching cities for region_id={region_id}...")
-        return await self._get(f"{BASE}/get-cities", params={"region_id": region_id})
+    async def _fetch_cities(self) -> list[dict]:
+        logger.info("Fetching all cities...")
+        return await self._get(f"{BASE}/get-cities")
 
-    async def _fetch_neighborhoods(self, city_id: int) -> list[dict]:
-        logger.info(f"Fetching neighborhoods for city_id={city_id}...")
-        return await self._get(f"{BASE}/get-neighborhoods", params={"city_id": city_id})
+    async def _fetch_neighbourhoods(self) -> list[dict]:
+        logger.info("Fetching all neighbourhoods...")
+        return await self._get(f"{BASE}/get-neighbourhoods")
 
 
 # ------------------------------------------------------------------
