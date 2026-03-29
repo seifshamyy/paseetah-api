@@ -10,6 +10,7 @@ import logging
 import os
 import time
 from typing import Optional
+from urllib.parse import unquote
 
 import httpx
 from playwright.async_api import async_playwright, Browser, BrowserContext
@@ -127,11 +128,49 @@ class AsyncAuthService:
         return self._cookies  # type: ignore[return-value]
 
     async def invalidate_and_relogin(self) -> None:
-        """Force a fresh login (called on 401/403 from data client)."""
-        logger.warning("Session invalidated. Performing fresh login...")
+        """On 401/403: try a cheap keepalive first; only do full Playwright login if that fails."""
+        logger.warning("Auth failure detected. Trying keepalive first...")
+        if self._cookies and await self.keepalive():
+            logger.info("Keepalive recovered the session — no re-login needed.")
+            return
+        logger.warning("Keepalive failed. Performing full Playwright login...")
         self._cookies = None
         _remove_cache(self._cache_file)
         await self.perform_login()
+
+    async def keepalive(self) -> bool:
+        """
+        Ping /api/user with the current cookies to reset the server-side
+        session TTL. Returns True if session is alive, False otherwise.
+        Safe to call frequently — takes ~1s.
+        """
+        if not self._cookies:
+            return False
+        try:
+            headers = {
+                "Accept": "application/json",
+                "X-Platform": "Chrome",
+                "X-Request-Source": "web",
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+                ),
+                "X-XSRF-TOKEN": unquote(self._cookies.get("XSRF-TOKEN", "")),
+            }
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    "https://paseetah.com/api/user",
+                    headers=headers,
+                    cookies=self._cookies,
+                )
+            if resp.status_code == 200:
+                logger.info("Session keepalive OK.")
+                return True
+            logger.warning(f"Session keepalive returned HTTP {resp.status_code}.")
+            return False
+        except Exception as exc:
+            logger.error(f"Session keepalive error: {exc}")
+            return False
 
     # ------------------------------------------------------------------
     # Playwright login flow

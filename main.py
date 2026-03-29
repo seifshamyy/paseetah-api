@@ -101,6 +101,24 @@ async def _fetch_with_retry(fetch_fn: Callable[..., Awaitable[dict]]) -> JSONRes
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
+@app.get("/api/v1/refresh-session", summary="Keep session alive", tags=["Auth"])
+async def refresh_session():
+    """
+    Pings paseetah.com/api/user with current cookies to reset the server-side
+    session TTL. Call this on a schedule (e.g. every 24h via Railway cron)
+    so the session never expires from inactivity.
+    Returns { alive: true } if session is healthy, { alive: false } if cookies
+    need to be updated.
+    """
+    alive = await auth_service.keepalive()
+    if alive:
+        return {"alive": True, "message": "Session is healthy."}
+    return JSONResponse(
+        status_code=401,
+        content={"alive": False, "message": "Session expired — update SESSION_CACHE_JSON on Railway with fresh cookies."},
+    )
+
 @app.post(
     "/api/v1/fetch-moj",
     summary="Ministry of Justice — Sales Transactions",
