@@ -90,6 +90,8 @@ class AsyncDataClient:
                 cookies=self._cookies,
             )
         logger.info(f"Response status: {response.status_code}")
+        if response.status_code >= 400:
+            logger.error(f"Error response body: {response.text[:500]}")
         response.raise_for_status()
         return response.json()
 
