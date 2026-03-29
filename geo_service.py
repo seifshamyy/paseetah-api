@@ -65,9 +65,7 @@ class GeoService:
         return [n for n in all_hoods if n.get("city_id") == city_id]
 
     async def get_full_tree(self, region_id: int) -> list[dict]:
-        """
-        Return all cities + neighborhoods for a given region.
-        """
+        """Return all cities + neighborhoods for a given region."""
         all_cities = await self._fetch_cities()
         all_hoods = await self._fetch_neighbourhoods()
         cities = [c for c in all_cities if c.get("region_id") == region_id]
@@ -77,6 +75,48 @@ class GeoService:
             hoods = [n for n in all_hoods if n.get("city_id") == cid]
             result.append({**city, "neighborhoods": hoods})
         return result
+
+    async def get_neighborhoods_by_region(self, region_id: int) -> list[dict]:
+        """
+        Return a flat array of ALL neighbourhoods across every city in the given region.
+        Each object is enriched with region_id.
+        """
+        all_cities = await self._fetch_cities()
+        all_hoods = await self._fetch_neighbourhoods()
+        # Build city_id → region_id lookup
+        city_region = {c["id"]: c["region_id"] for c in all_cities if "id" in c}
+        return [
+            {
+                "id": n["id"],
+                "name_en": n.get("name_en"),
+                "name_ar": n.get("name_ar"),
+                "city_id": n.get("city_id"),
+                "region_id": city_region.get(n.get("city_id")),
+            }
+            for n in all_hoods
+            if city_region.get(n.get("city_id")) == region_id
+        ]
+
+    async def get_neighborhoods_by_city(self, city_id: int) -> list[dict]:
+        """
+        Return a flat array of ALL neighbourhoods in a specific city.
+        Each object is enriched with region_id.
+        """
+        all_cities = await self._fetch_cities()
+        all_hoods = await self._fetch_neighbourhoods()
+        city_region = {c["id"]: c["region_id"] for c in all_cities if "id" in c}
+        return [
+            {
+                "id": n["id"],
+                "name_en": n.get("name_en"),
+                "name_ar": n.get("name_ar"),
+                "city_id": n.get("city_id"),
+                "region_id": city_region.get(n.get("city_id")),
+            }
+            for n in all_hoods
+            if n.get("city_id") == city_id
+        ]
+
 
     async def probe_neighborhoods(self, city_id: int = 1, region_id: int = 1) -> list[dict]:
         """

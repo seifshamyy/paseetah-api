@@ -193,7 +193,48 @@ async def probe_neighborhoods_endpoint(city_id: int = 1, region_id: int = 1):
         raise HTTPException(status_code=400, detail=f"{type(exc).__name__}: {exc}")
 
 
+# ---------------------------------------------------------------------------
+# Named city neighborhood endpoints
+# ---------------------------------------------------------------------------
 
+@app.get("/api/v1/geo/riyadh/neighborhoods", summary="All neighborhoods in Riyadh Region", tags=["Geo"])
+async def riyadh_neighborhoods():
+    """
+    Returns all neighborhoods across every city in Riyadh Region (region_id=1).
+    Each object: { id, name_en, name_ar, city_id, region_id }
+    """
+    try:
+        cookies = await auth_service.get_cookies()
+        return await GeoService(cookies).get_neighborhoods_by_region(region_id=1)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"{type(exc).__name__}: {exc}")
+
+
+@app.get("/api/v1/geo/mecca/neighborhoods", summary="All neighborhoods in Mecca Region", tags=["Geo"])
+async def mecca_neighborhoods():
+    """
+    Returns all neighborhoods across every city in Mecca Region (region_id=3).
+    Includes Jeddah, Mecca city, Taif, and all other cities in the region.
+    Each object: { id, name_en, name_ar, city_id, region_id }
+    """
+    try:
+        cookies = await auth_service.get_cookies()
+        return await GeoService(cookies).get_neighborhoods_by_region(region_id=3)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"{type(exc).__name__}: {exc}")
+
+
+@app.get("/api/v1/geo/jeddah/neighborhoods", summary="All neighborhoods in Jeddah city only", tags=["Geo"])
+async def jeddah_neighborhoods():
+    """
+    Returns all neighborhoods in Jeddah city specifically (city_id=16).
+    Each object: { id, name_en, name_ar, city_id, region_id }
+    """
+    try:
+        cookies = await auth_service.get_cookies()
+        return await GeoService(cookies).get_neighborhoods_by_city(city_id=16)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"{type(exc).__name__}: {exc}")
 
 # ---------------------------------------------------------------------------
 # Dev runner
