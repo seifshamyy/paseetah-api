@@ -233,51 +233,37 @@ class GeoService:
 
 
     # ------------------------------------------------------------------
-    # Internal fetchers
+    # Internal fetchers  (all use POST — Paseetah rejects GET with 401/405)
     # ------------------------------------------------------------------
 
-    async def _get(self, url: str, params: dict = None) -> list:
+    async def _post(self, url: str) -> list:
+        """POST to a Paseetah geo endpoint, parse list response."""
         async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
-            resp = await client.get(
-                url,
-                params=params,
-                headers=self._headers,
-                cookies=self._cookies,
-            )
+            resp = await client.post(url, headers=self._headers, cookies=self._cookies)
         resp.raise_for_status()
         data = resp.json()
-        # Paseetah wraps in { data: [...] } or returns a list directly
         if isinstance(data, list):
             return data
         if isinstance(data, dict):
-            return data.get("data") or data.get("regions") or data.get("cities") or data.get("neighborhoods") or []
+            for key in ("data", "regions", "cities", "neighbourhoods", "neighborhoods"):
+                if data.get(key):
+                    return data[key]
         return []
 
     async def _fetch_regions(self) -> list[dict]:
         logger.info("Fetching regions...")
-        regions = await self._get(f"{BASE}/get-regions")
+        regions = await self._post(f"{BASE}/get-regions")
         _save_cache({"regions": regions})
         return regions
 
     async def _fetch_cities(self) -> list[dict]:
         logger.info("Fetching all cities...")
-        return await self._get(f"{BASE}/get-cities")
+        return await self._post(f"{BASE}/get-cities")
 
     async def _fetch_neighbourhoods(self) -> list[dict]:
         logger.info("Fetching all neighbourhoods...")
-        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
-            resp = await client.post(
-                f"{BASE}/get-neighbourhoods",
-                headers=self._headers,
-                cookies=self._cookies,
-            )
-        resp.raise_for_status()
-        data = resp.json()
-        if isinstance(data, list):
-            return data
-        if isinstance(data, dict):
-            return data.get("data") or data.get("neighbourhoods") or data.get("neighborhoods") or []
-        return []
+        return await self._post(f"{BASE}/get-neighbourhoods")
+
 
 
 # ------------------------------------------------------------------
