@@ -104,13 +104,6 @@ async def _fetch_with_retry(fetch_fn: Callable[..., Awaitable[dict]]) -> JSONRes
 
 @app.get("/api/v1/refresh-session", summary="Keep session alive", tags=["Auth"])
 async def refresh_session():
-    """
-    Pings paseetah.com/api/user with current cookies to reset the server-side
-    session TTL. Call this on a schedule (e.g. every 24h via Railway cron)
-    so the session never expires from inactivity.
-    Returns { alive: true } if session is healthy, { alive: false } if cookies
-    need to be updated.
-    """
     alive = await auth_service.keepalive()
     if alive:
         return {"alive": True, "message": "Session is healthy."}
@@ -118,6 +111,20 @@ async def refresh_session():
         status_code=401,
         content={"alive": False, "message": "Session expired — update SESSION_CACHE_JSON on Railway with fresh cookies."},
     )
+
+
+@app.get("/api/v1/debug/xsrf", summary="Debug XSRF token state", tags=["Auth"])
+async def debug_xsrf():
+    """Shows raw XSRF-TOKEN cookie and decoded header value — use to diagnose 419/401 on POST endpoints."""
+    from urllib.parse import unquote
+    cookies = await auth_service.get_cookies()
+    raw = cookies.get("XSRF-TOKEN", "MISSING")
+    decoded = unquote(raw)
+    return {
+        "cookie_raw": raw[:80] + "..." if len(raw) > 80 else raw,
+        "header_decoded": decoded[:80] + "..." if len(decoded) > 80 else decoded,
+        "cookie_keys": list(cookies.keys()),
+    }
 
 @app.post(
     "/api/v1/fetch-moj",
