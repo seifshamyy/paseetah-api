@@ -114,10 +114,11 @@ class AsyncAuthService:
     # ------------------------------------------------------------------
 
     async def startup(self) -> None:
-        """Load cached cookies from disk if available."""
+        """Load cached cookies from disk if available, then refresh XSRF-TOKEN."""
         self._cookies = self._load_cache()
         if self._cookies:
-            logger.info("Loaded session cookies from cache.")
+            logger.info("Loaded session cookies from cache. Refreshing XSRF-TOKEN...")
+            await self.keepalive()  # refreshes XSRF-TOKEN from server Set-Cookie
         else:
             logger.info("No cached session found. Login will be triggered on first request.")
 
@@ -140,9 +141,9 @@ class AsyncAuthService:
 
     async def keepalive(self) -> bool:
         """
-        Ping /api/user with the current cookies to reset the server-side
-        session TTL. Returns True if session is alive, False otherwise.
-        Safe to call frequently — takes ~1s.
+        Ping /api/user with the current cookies.
+        Captures any rotated XSRF-TOKEN from Set-Cookie response so subsequent
+        POST requests use the fresh token. Returns True if session is alive.
         """
         if not self._cookies:
             return False
@@ -165,12 +166,27 @@ class AsyncAuthService:
                 )
             if resp.status_code == 200:
                 logger.info("Session keepalive OK.")
+                self._capture_rotated_cookies(resp)
                 return True
             logger.warning(f"Session keepalive returned HTTP {resp.status_code}.")
             return False
         except Exception as exc:
             logger.error(f"Session keepalive error: {exc}")
             return False
+
+    def _capture_rotated_cookies(self, response: httpx.Response) -> None:
+        """
+        After any successful Paseetah response, check Set-Cookie for a
+        refreshed XSRF-TOKEN (Laravel rotates it regularly) and persist it.
+        """
+        updated = False
+        for name, value in response.cookies.items():
+            if value and value != self._cookies.get(name):
+                logger.info(f"Captured rotated cookie: {name}")
+                self._cookies[name] = value
+                updated = True
+        if updated:
+            self._save_cache(self._cookies)
 
     # ------------------------------------------------------------------
     # Playwright login flow
