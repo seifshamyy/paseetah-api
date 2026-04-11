@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Optional
 from pydantic import BaseModel
 
 
@@ -10,6 +12,9 @@ class MojDataRequest(BaseModel):
     deals_exact_match: bool = True
     plans_exact_match: bool = True
     parcels_exact_match: bool = True
+    zoning: Optional[list[str]] = None
+    minAreaSize: Optional[float] = None
+    maxAreaSize: Optional[float] = None
     sort_column: str = "deal_date"
     sort_order: str = "descending"
 
@@ -23,6 +28,9 @@ class CivilDataRequest(BaseModel):
     planExactMatch: bool = True
     parcelExactMatch: bool = True
     realEstateNumberExactMatch: bool = True
+    zoning: Optional[list[str]] = None
+    minAreaSize: Optional[float] = None
+    maxAreaSize: Optional[float] = None
     sort_column: str = "transaction_date"
     sort_order: str = "descending"
 

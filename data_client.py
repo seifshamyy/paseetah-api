@@ -97,11 +97,11 @@ class AsyncDataClient:
 
     async def fetch_moj(self, request: MojDataRequest) -> dict:
         """Ministry of Justice — sales_transaction."""
-        return await self._post(MOJ_URL, MOJ_REFERER, request.model_dump())
+        return await self._post(MOJ_URL, MOJ_REFERER, request.model_dump(exclude_none=True))
 
     async def fetch_civil(self, request: CivilDataRequest) -> dict:
         """Civil / Real-Estate Register — rer_transactions."""
-        return await self._post(CIVIL_URL, CIVIL_REFERER, request.model_dump())
+        return await self._post(CIVIL_URL, CIVIL_REFERER, request.model_dump(exclude_none=True))
 
     async def probe_geo_endpoints(self) -> list[dict]:
         """
