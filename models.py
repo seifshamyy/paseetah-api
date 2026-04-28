@@ -4,10 +4,11 @@ from pydantic import BaseModel
 
 
 class MojDataRequest(BaseModel):
-    """Ministry of Justice — sales_transaction endpoint."""
+    """Ministry of Justice — moj_transaction endpoint."""
     page: int = 1
     regions: list[int] = []
     cities: list[int] = []
+    directions: list[str] = []
     neighborhoods: list[int] = []
     deals_exact_match: bool = True
     plans_exact_match: bool = True

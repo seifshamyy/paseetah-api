@@ -17,10 +17,10 @@ from models import MojDataRequest, CivilDataRequest
 
 logger = logging.getLogger(__name__)
 
-MOJ_URL = "https://paseetah.com/api/precord/sales_transaction/data"
+MOJ_URL = "https://paseetah.com/api/precord/moj_transaction/data"
 CIVIL_URL = "https://paseetah.com/api/precord/rer_transactions/data"
 
-MOJ_REFERER = "https://paseetah.com/paseetah-record/sales_transaction"
+MOJ_REFERER = "https://paseetah.com/paseetah-record/moj_transaction"
 CIVIL_REFERER = "https://paseetah.com/paseetah-record/rer_transactions"
 
 COMMON_HEADERS = {
