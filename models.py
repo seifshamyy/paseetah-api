@@ -8,7 +8,7 @@ class MojDataRequest(BaseModel):
     page: int = 1
     regions: list[int] = []
     cities: list[int] = []
-    directions: list[str] = []
+    directions: Optional[list[str]] = None
     neighborhoods: list[int] = []
     deals_exact_match: bool = True
     plans_exact_match: bool = True
