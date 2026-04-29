@@ -36,5 +36,11 @@ class CivilDataRequest(BaseModel):
     sort_order: str = "descending"
 
 
+class ShareDataRequest(BaseModel):
+    """Get shared transaction/parcel data by share type and ID."""
+    shareType: str = "transaction"
+    shareId: str
+
+
 # Backwards-compat alias
 PaseetahDataRequest = MojDataRequest

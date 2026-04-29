@@ -18,7 +18,7 @@ from auth_service import AsyncAuthService, LoginError
 from config import settings
 from data_client import AsyncDataClient
 from geo_service import GeoService
-from models import MojDataRequest, CivilDataRequest
+from models import MojDataRequest, CivilDataRequest, ShareDataRequest
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -49,9 +49,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Paseetah Real Estate API",
     description=(
-        "Authenticated proxy to Paseetah. Two datasets:\n\n"
+        "Authenticated proxy to Paseetah. Three data endpoints:\n\n"
         "- **MOJ** (`/api/v1/fetch-moj`): Ministry of Justice sales transactions\n"
-        "- **Civil** (`/api/v1/fetch-civil`): Real Estate Register (RER) transactions"
+        "- **Civil** (`/api/v1/fetch-civil`): Real Estate Register (RER) transactions\n"
+        "- **Share Data** (`/api/v1/get-share-data`): Shared transaction/parcel details"
     ),
     version="2.0.0",
     lifespan=lifespan,
@@ -150,6 +151,19 @@ async def fetch_civil(request: CivilDataRequest):
     Filter by `regions`, `cities`, and/or `neighborhoods` (list of ints).
     """
     return await _fetch_with_retry(lambda client: client.fetch_civil(request))
+
+
+@app.post(
+    "/api/v1/get-share-data",
+    summary="Get shared transaction / parcel details",
+    tags=["Share"],
+)
+async def get_share_data(request: ShareDataRequest):
+    """
+    Retrieve detailed data for a shared transaction or parcel.
+    Pass `shareType` (e.g. "transaction") and `shareId` (the deal/parcel ID as a string).
+    """
+    return await _fetch_with_retry(lambda client: client.fetch_share_data(request))
 
 
 @app.get(

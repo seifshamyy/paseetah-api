@@ -13,7 +13,7 @@ from urllib.parse import unquote
 
 import httpx
 
-from models import MojDataRequest, CivilDataRequest
+from models import MojDataRequest, CivilDataRequest, ShareDataRequest
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,9 @@ CIVIL_URL = "https://paseetah.com/api/precord/rer_transactions/data"
 
 MOJ_REFERER = "https://paseetah.com/paseetah-record/moj_transaction"
 CIVIL_REFERER = "https://paseetah.com/paseetah-record/rer_transactions"
+
+SHARE_DATA_URL = "https://paseetah.com/api/get-share-data"
+SHARE_DATA_REFERER = "https://paseetah.com/paseetah-record/moj_transaction"
 
 COMMON_HEADERS = {
     "Accept": "application/json",
@@ -102,6 +105,10 @@ class AsyncDataClient:
     async def fetch_civil(self, request: CivilDataRequest) -> dict:
         """Civil / Real-Estate Register — rer_transactions."""
         return await self._post(CIVIL_URL, CIVIL_REFERER, request.model_dump(exclude_none=True))
+
+    async def fetch_share_data(self, request: ShareDataRequest) -> dict:
+        """Get shared transaction/parcel data."""
+        return await self._post(SHARE_DATA_URL, SHARE_DATA_REFERER, request.model_dump())
 
     async def probe_geo_endpoints(self) -> list[dict]:
         """
